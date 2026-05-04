@@ -2,30 +2,32 @@
 """
 Anomaly Detection for Ethiopia Data Loader.
 
-Detects unusual patterns and outliers in Ethiopian datasets (Population, IDPs, ACLED, etc.).
-Optimized for QGIS 4.x.
+Detects unusual patterns and outliers in Ethiopia data.
 """
 
 import math
-import re
-from qgis.core import QgsProject, QgsVectorLayer, QgsGeometry
+from qgis.core import QgsProject, QgsVectorLayer
 
 
-class EthiopiaAnomalyDetector:
-    """Detects anomalies and outliers in Ethiopian geospatial and humanitarian data."""
+class AnomalyDetector:
+    """Detects anomalies and outliers in Ethiopia data."""
 
     def __init__(self):
-        """Initialize the Ethiopia anomaly detector."""
+        """Initialize the anomaly detector."""
         pass
 
     def detect_outliers_zscore(self, values, threshold=2.0):
         """
         Detect outliers using Z-score method.
-        Useful for detecting unusual population spikes in Woredas or Zones.
+
+        :param values: List of numeric values
+        :param threshold: Z-score threshold (default 2.0)
+        :returns: List of (index, value, zscore) tuples for outliers
         """
         if not values or len(values) < 3:
             return []
 
+        # Calculate mean and standard deviation
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / len(values)
         std = math.sqrt(variance) if variance > 0 else 0
@@ -49,7 +51,10 @@ class EthiopiaAnomalyDetector:
     def detect_outliers_iqr(self, values, multiplier=1.5):
         """
         Detect outliers using Interquartile Range (IQR) method.
-        Robust against extreme data errors.
+
+        :param values: List of numeric values
+        :param multiplier: IQR multiplier (default 1.5)
+        :returns: List of outlier dictionaries
         """
         if not values or len(values) < 4:
             return []
@@ -71,22 +76,33 @@ class EthiopiaAnomalyDetector:
         for i, value in enumerate(values):
             if value < lower_bound:
                 outliers.append({
-                    'index': i, 'value': value, 'bound': lower_bound, 'type': 'low'
+                    'index': i,
+                    'value': value,
+                    'bound': lower_bound,
+                    'type': 'low'
                 })
             elif value > upper_bound:
                 outliers.append({
-                    'index': i, 'value': value, 'bound': upper_bound, 'type': 'high'
+                    'index': i,
+                    'value': value,
+                    'bound': upper_bound,
+                    'type': 'high'
                 })
 
         return outliers
 
     def detect_spatial_anomalies(self, layer, field_name):
         """
-        Detect features with anomalous attribute values (e.g. outlier population in a Zone).
+        Detect features with anomalous attribute values.
+
+        :param layer: QgsVectorLayer
+        :param field_name: Field name to analyze
+        :returns: Anomaly report dictionary
         """
         if not layer or field_name not in [f.name() for f in layer.fields()]:
             return {'error': 'Invalid layer or field'}
 
+        # Collect values with feature IDs
         values_with_ids = []
         for feature in layer.getFeatures():
             value = feature[field_name]
@@ -105,24 +121,25 @@ class EthiopiaAnomalyDetector:
             return {'error': 'No numeric values found'}
 
         values = [v['value'] for v in values_with_ids]
+
+        # Detect outliers using both methods
         zscore_outliers = self.detect_outliers_zscore(values)
         iqr_outliers = self.detect_outliers_iqr(values)
 
+        # Map back to features
         anomalies = []
         outlier_indices = set(o['index'] for o in zscore_outliers + iqr_outliers)
 
         for idx in outlier_indices:
             if idx < len(values_with_ids):
                 feature_data = values_with_ids[idx]
-                # QGIS 4.x centroid access
-                centroid = None
-                if feature_data['geometry'] and not feature_data['geometry'].isEmpty():
-                    centroid = feature_data['geometry'].centroid().asPoint()
-
                 anomalies.append({
                     'feature_id': feature_data['id'],
                     'value': feature_data['value'],
-                    'location': centroid
+                    'location': (
+                        feature_data['geometry'].centroid().asPoint()
+                        if feature_data['geometry'] else None
+                    )
                 })
 
         return {
@@ -139,108 +156,130 @@ class EthiopiaAnomalyDetector:
 
     def detect_data_quality_issues(self, layer):
         """
-        Detect potential data quality issues specific to Ethiopia COD-AB data.
-        Includes checks for ET P-Codes.
+        Detect potential data quality issues in a layer.
+
+        :param layer: QgsVectorLayer
+        :returns: Quality report dictionary
         """
         if not layer:
             return {'error': 'Invalid layer'}
 
         issues = []
+
+        # Check for null geometries
         null_geom_count = 0
         invalid_geom_count = 0
-        pcode_issue_count = 0
-        
-        # Regex for Ethiopian P-Codes (e.g., ET04, ET0401, ET040101)
-        pcode_pattern = re.compile(r'^ET\d{2,6}$')
+        empty_geom_count = 0
 
         for feature in layer.getFeatures():
-            # Geometry Checks
             geom = feature.geometry()
-            if geom.isNull():
+            if geom is None:
                 null_geom_count += 1
+            elif geom.isEmpty():
+                empty_geom_count += 1
             elif not geom.isGeosValid():
                 invalid_geom_count += 1
-            
-            # Ethiopia-Specific P-Code Validation
-            # Checks common HDX fields like 'ADM1_PCODE', 'ADM2_PCODE', 'ADM3_PCODE'
-            for field in layer.fields():
-                fname = field.name().upper()
-                if 'PCODE' in fname:
-                    val = str(feature[field.name()])
-                    if val and val != 'NULL' and not pcode_pattern.match(val):
-                        pcode_issue_count += 1
 
         if null_geom_count > 0:
-            issues.append({'type': 'null_geometry', 'count': null_geom_count, 'severity': 'high', 
-                           'description': f'{null_geom_count} features have missing geometry'})
+            issues.append({
+                'type': 'null_geometry',
+                'count': null_geom_count,
+                'severity': 'high',
+                'description': f'{null_geom_count} features have no geometry'
+            })
+
+        if empty_geom_count > 0:
+            issues.append({
+                'type': 'empty_geometry',
+                'count': empty_geom_count,
+                'severity': 'medium',
+                'description': f'{empty_geom_count} features have empty geometry'
+            })
 
         if invalid_geom_count > 0:
-            issues.append({'type': 'invalid_geometry', 'count': invalid_geom_count, 'severity': 'high', 
-                           'description': f'{invalid_geom_count} features have invalid topology'})
-                           
-        if pcode_issue_count > 0:
-            issues.append({'type': 'invalid_pcode', 'count': pcode_issue_count, 'severity': 'medium', 
-                           'description': f'{pcode_issue_count} features have non-standard Ethiopian P-Codes'})
+            issues.append({
+                'type': 'invalid_geometry',
+                'count': invalid_geom_count,
+                'severity': 'high',
+                'description': f'{invalid_geom_count} features have invalid geometry'
+            })
 
         # Check for null attribute values
         for field in layer.fields():
             null_count = 0
             for feature in layer.getFeatures():
-                val = feature[field.name()]
-                if val is None or str(val).strip() == '' or str(val).lower() == 'null':
+                if feature[field.name()] is None or str(feature[field.name()]).strip() == '':
                     null_count += 1
 
             if null_count > 0:
                 pct = (null_count / layer.featureCount()) * 100
                 severity = 'high' if pct > 50 else ('medium' if pct > 20 else 'low')
+
                 issues.append({
                     'type': 'null_attributes',
                     'field': field.name(),
                     'count': null_count,
                     'percentage': pct,
                     'severity': severity,
-                    'description': f'{null_count} nulls ({pct:.1f}%) in "{field.name()}"'
+                    'description': f'{null_count} null values ({pct:.1f}%) in field "{field.name()}"'
                 })
 
         return {
             'layer': layer.name(),
+            'total_features': layer.featureCount(),
             'issue_count': len(issues),
             'issues': sorted(issues, key=lambda x: {'high': 0, 'medium': 1, 'low': 2}[x['severity']])
         }
 
     def detect_temporal_anomalies(self, events, date_field='date', value_field='count'):
         """
-        Detect anomalies in temporal event data (e.g. ACLED Ethiopia conflict spikes).
+        Detect anomalies in temporal event data.
+
+        :param events: List of event dictionaries
+        :param date_field: Field name for date
+        :param value_field: Field name for value to analyze
+        :returns: Anomaly report
         """
         if not events:
             return {'error': 'No events provided'}
 
+        # Group by date
         by_date = {}
         for event in events:
-            date = str(event.get(date_field, ''))
+            date = event.get(date_field, '')
             value = event.get(value_field, 1)
-            by_date[date] = by_date.get(date, 0) + value
+
+            if date not in by_date:
+                by_date[date] = 0
+            by_date[date] += value
 
         if len(by_date) < 5:
-            return {'error': 'Insufficient data for temporal trend analysis'}
+            return {'error': 'Not enough data points for temporal analysis'}
 
+        # Sort by date and get values
         sorted_dates = sorted(by_date.keys())
         values = [by_date[d] for d in sorted_dates]
 
+        # Detect outliers
         outliers = self.detect_outliers_zscore(values, threshold=2.5)
 
         anomalous_dates = []
         for outlier in outliers:
             idx = outlier['index']
-            anomalous_dates.append({
-                'date': sorted_dates[idx],
-                'value': outlier['value'],
-                'type': outlier['type'],
-                'description': f"{'Spike' if outlier['type'] == 'high' else 'Drop'} detected on {sorted_dates[idx]}"
-            })
+            if idx < len(sorted_dates):
+                anomalous_dates.append({
+                    'date': sorted_dates[idx],
+                    'value': outlier['value'],
+                    'type': outlier['type'],
+                    'description': f"{'Unusually high' if outlier['type'] == 'high' else 'Unusually low'} activity on {sorted_dates[idx]}"
+                })
 
         return {
             'total_dates': len(sorted_dates),
             'anomaly_count': len(anomalous_dates),
-            'anomalies': anomalous_dates
+            'anomalies': anomalous_dates,
+            'date_range': {
+                'start': sorted_dates[0] if sorted_dates else None,
+                'end': sorted_dates[-1] if sorted_dates else None
+            }
         }
