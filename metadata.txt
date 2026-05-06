@@ -1,0 +1,73 @@
+[general]
+name=Ethiopia Data Loader
+qgisMinimumVersion=4.0
+qgisMaximumVersion=4.99
+description=A comprehensive Ethiopia GIS toolkit with AI features, modern dashboard, and research tools for loading, visualizing, and analyzing administrative boundary data (COD-AB v04).
+version=1.0.0
+author=Bayilla Geda
+email=bayillag@gmail.com
+tracker=https://github.com/bayillag/ethiopia_data_loader/issues
+repository=https://github.com/bayillag/ethiopia_data_loader
+
+about=A full-featured QGIS 4.x plugin for Ethiopia administrative data management and analysis.
+
+    === ETHIOPIA VERSION 1.0: MAJOR RELEASE ===
+
+    === ETHIOPIA DATA GRID (HDX) ===
+    - Direct Integration with https://data.humdata.org/group/eth
+    - Specialized categories for Ethiopian humanitarian context:
+      • Affected People (IDPs, Refugees, Stateless)
+      • Coordination & Context (3W Operational Presence, Funding)
+      • Food Security, Nutrition & Poverty (IPC levels, Food Prices)
+      • Geography & Infrastructure (COD-AB Boundaries, Roads)
+      • Health & Education (HOT OSM facilities)
+      • Climate & Environment (Hazards, Rivers)
+
+    === ADMINISTRATIVE STRUCTURE (COD-AB v04) ===
+    - Admin 0: National Boundary
+    - Admin 1: 15 Regions (including Central, South, and South West Ethiopia)
+    - Admin 2: 107 Zones
+    - Admin 3: 1148 Woredas
+    - Contested Areas (ET99): Specialized cartographic handling for disputed borders.
+
+    === SMART FEATURES & AI ===
+    - Natural Language Query Parser:
+      • "Show all woredas in Oromia"
+      • "Find health facilities in Tigray"
+      • "Select contested areas (ET99)"
+    - Auto-Fill Area: Automatic SqKm calculation using WGS84 Ellipsoid.
+    - Anomaly Detection: Z-score and IQR methods for population data.
+
+    === DATA SOURCES ===
+    - Sentinel Hub: Satellite imagery browser with cloud filtering for Ethiopia.
+    - OpenStreetMap: Overpass API for infrastructure and POI queries.
+    - NASA FIRMS: Fire/Hotspot detection clipped to Ethiopia boundaries.
+
+    === QGIS 4.x INTEGRATION ===
+    - Processing Provider: Ethiopia-specific tools (Clip by Region, Zonal Stats).
+    - Custom Expression Functions:
+      • eth_region_from_pcode(pcode)
+      • eth_area_km2()
+      • eth_is_contested(pcode)
+      • eth_woreda_count(region)
+    - Modern Dashboard: KPI cards for 15/107/1148 feature validation.
+    - Research Tools: Citation Generator (APA, BibTeX) and Spatial Statistics.
+
+changelog=1.0.0 - Major Ethiopia Release
+    - Complete migration to QGIS 4.x (PyQt6)
+    - Updated administrative logic for 15 Regions (including latest splits)
+    - Added Ethiopia Data Grid menu (HDX)
+    - Integrated ET99 Contested Area logic
+    - Added Auto-Fill Area (SqKm) tool
+    - Implementation of Amharic naming aliases
+
+tags=ethiopia,administrative,boundaries,woreda,zone,region,africa,hdx,humanitarian,acled,conflict,osm,satellite,sentinel,dashboard,ai,nlp,research,spatial-statistics,cod-ab,et99
+
+homepage=https://github.com/bayillag/ethiopia_data_loader
+category=Vector
+icon=icon.png
+experimental=False
+deprecated=False
+server=False
+hasProcessingProvider=yes
+license=GPLv3
